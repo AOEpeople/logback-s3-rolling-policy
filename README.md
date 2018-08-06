@@ -193,7 +193,7 @@ Libraries
 ---------
 
 This project uses the following libraries:
-* `com.amazonaws:aws-java-sdk:1.11.7`
+* `com.amazonaws:aws-java-sdk:1.11.380`
 * `ch.qos.logback:logback-classic:1.1.3`
 * `com.google.guava:guava:18.0`
 * `javax.servlet:servlet-api:2.4` (scope provided)
@@ -209,3 +209,4 @@ For now we only have a manual way to publish this to Artifactory
 * (install maven)
 * execute `mvn package` (this adds a jar file to the /target folder)
 * upload the created package to Artifactory by hand (make sure to check `Generate Default POM / Deploy Jar's Internal POM` when uploading)
+* be aware of a bug when uploading to Artifactory (https://www.jfrog.com/jira/browse/RTFACT-17063)

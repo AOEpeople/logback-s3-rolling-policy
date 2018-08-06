@@ -35,6 +35,7 @@ public class S3FixedWindowRollingPolicy extends FixedWindowRollingPolicy impleme
     private String           s3BucketName;
     private String           s3FolderName;
     private String           s3Endpoint;
+    private String           s3Region;
     private ShutdownHookType shutdownHookType;
     private boolean          rolloverOnExit;
     private boolean          prefixTimestamp;
@@ -58,7 +59,7 @@ public class S3FixedWindowRollingPolicy extends FixedWindowRollingPolicy impleme
         super.start();
 
         //Init S3 client
-        s3Client = new AmazonS3ClientImpl( getAwsAccessKey(), getAwsSecretKey(), getS3BucketName(), getS3FolderName(), getS3Endpoint(), isPrefixTimestamp(),
+        s3Client = new AmazonS3ClientImpl( getAwsAccessKey(), getAwsSecretKey(), getS3BucketName(), getS3FolderName(), getS3Endpoint(), getS3Region(), isPrefixTimestamp(),
                 isPrefixIdentifier() );
 
         if (isPrefixIdentifier()) {
@@ -148,6 +149,14 @@ public class S3FixedWindowRollingPolicy extends FixedWindowRollingPolicy impleme
     public void setS3Endpoint(String s3Endpoint) {
 
         this.s3Endpoint = s3Endpoint;
+    }
+
+    public String getS3Region() {
+        return s3Region;
+    }
+
+    public void setS3Region(String region) {
+        this.s3Region = region;
     }
 
     public boolean isRolloverOnExit() {

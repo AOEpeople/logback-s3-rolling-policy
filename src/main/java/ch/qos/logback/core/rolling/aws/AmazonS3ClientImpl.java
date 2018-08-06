@@ -20,9 +20,11 @@ import ch.qos.logback.core.rolling.data.CustomData;
 import ch.qos.logback.core.rolling.shutdown.RollingPolicyShutdownListener;
 import ch.qos.logback.core.rolling.util.IdentifierUtil;
 import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.S3ClientOptions;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.util.StringUtils;
 
 import java.io.File;
@@ -47,16 +49,23 @@ public class AmazonS3ClientImpl implements RollingPolicyShutdownListener {
     private final String s3BucketName;
     private final String s3FolderName;
     private final String s3Endpoint;
+    private final String s3Region;
 
     private final boolean prefixTimestamp;
     private final boolean prefixIdentifier;
 
     private final String identifier;
 
-    private AmazonS3Client  amazonS3Client;
+    private AmazonS3 amazonS3Client;
     private ExecutorService executor;
 
-    public AmazonS3ClientImpl(String awsAccessKey, String awsSecretKey, String s3BucketName, String s3FolderName, String s3Endpoint, boolean prefixTimestamp,
+    public AmazonS3ClientImpl(String awsAccessKey,
+                              String awsSecretKey,
+                              String s3BucketName,
+                              String s3FolderName,
+                              String s3Endpoint,
+                              String s3Region,
+                              boolean prefixTimestamp,
                               boolean prefixIdentifier) {
 
         this.awsAccessKey = awsAccessKey;
@@ -64,45 +73,42 @@ public class AmazonS3ClientImpl implements RollingPolicyShutdownListener {
         this.s3BucketName = s3BucketName;
         this.s3FolderName = s3FolderName;
         this.s3Endpoint = s3Endpoint;
+        this.s3Region = s3Region;
 
         this.prefixTimestamp = prefixTimestamp;
         this.prefixIdentifier = prefixIdentifier;
 
         executor = Executors.newFixedThreadPool( 1 );
-        amazonS3Client = null;
+        amazonS3Client = getClient();
 
         identifier = prefixIdentifier? IdentifierUtil.getIdentifier(): null;
     }
 
-    public void uploadFileToS3Async(final String filename, final Date date) {
+    private AmazonS3 getClient() {
+        // If the access and secret key is not specified then try to use other providers
+        if (getAwsAccessKey() == null || getAwsAccessKey().trim().isEmpty()) {
+            return AmazonS3ClientBuilder.defaultClient();
+        }
 
+        AWSCredentials cred = new BasicAWSCredentials(getAwsAccessKey(), getAwsSecretKey());
+
+        if(StringUtils.isNullOrEmpty(getS3Endpoint()) || getS3Endpoint().equals("S3_ENDPOINT_IS_UNDEFINED")) {
+            return AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(cred)).build();
+        }
+
+        return AmazonS3ClientBuilder
+                .standard()
+                .withCredentials(new AWSStaticCredentialsProvider(cred))
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(getS3Endpoint(), getS3Region()))
+                .withPathStyleAccessEnabled(true) // this allows us to point the client to http://endpoint/bucketname instead of http://bucketname.endpoint which fits perfectly to minio.
+                .build();
+    }
+
+    public void uploadFileToS3Async(final String filename, final Date date) {
         uploadFileToS3Async( filename, date, false );
     }
 
     public void uploadFileToS3Async(final String filename, final Date date, final boolean overrideTimestampSetting) {
-
-        if (amazonS3Client == null) {
-
-            // If the access and secret key is not specified then try to use other providers
-            if (getAwsAccessKey() == null || getAwsAccessKey().trim().isEmpty()) {
-
-                amazonS3Client = new AmazonS3Client();
-            } else {
-
-                AWSCredentials cred = new BasicAWSCredentials( getAwsAccessKey(), getAwsSecretKey() );
-                amazonS3Client = new AmazonS3Client( cred );
-            }
-
-            if(!StringUtils.isNullOrEmpty(getS3Endpoint()) && !getS3Endpoint().equals("S3_ENDPOINT_IS_UNDEFINED")) {
-                amazonS3Client.setEndpoint(getS3Endpoint());
-
-                // this allows us to point the client to http://endpoint/bucketname instead of http://bucketname.endpoint
-                // which fits perfectly to minio.
-                final S3ClientOptions clientOptions = S3ClientOptions.builder().setPathStyleAccess(true).build();
-                amazonS3Client.setS3ClientOptions(clientOptions);
-            }
-        }
-
         final File file = new File( filename );
 
         //If file does not exist or if empty, do nothing
@@ -217,6 +223,10 @@ public class AmazonS3ClientImpl implements RollingPolicyShutdownListener {
     public String getS3Endpoint() {
 
         return s3Endpoint;
+    }
+
+    public String getS3Region() {
+        return s3Region;
     }
 
     public boolean isPrefixTimestamp() {
